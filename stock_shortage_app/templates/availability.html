@@ -1351,6 +1351,7 @@
             if (hasShortage) {
                 tr.style.background = 'rgba(244, 63, 94, 0.08)';
             }
+            const availAtDate = (item.Opening_Stock_Balance !== undefined && item.Opening_Stock_Balance !== null) ? Math.max(0, item.Opening_Stock_Balance) : item.Initial_Stock_MB52;
             tr.innerHTML = `
                 <td style="font-weight:600; color:var(--accent-cyan);">${item.Article}</td>
                 <td>${item['Material Description'] || item.Article}</td>
@@ -1358,7 +1359,7 @@
                 <td>${item.Ordered_Qty.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</td>
                 <td>${item.Fulfilled_Qty.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</td>
                 <td style="color:${hasShortage ? '#f43f5e' : '#10b981'}; font-weight:700;">${hasShortage ? '⚠️ ' + item.Shortage_Qty.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2}) : '0'}</td>
-                <td>${item.Initial_Stock_MB52.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</td>
+                <td>${availAtDate.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})} <span style="font-size:0.75rem; color:var(--text-muted);">(Start: ${item.Initial_Stock_MB52.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})})</span></td>
                 <td>${statusBadge}</td>
             `;
             tbody.appendChild(tr);

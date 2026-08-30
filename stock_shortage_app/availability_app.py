@@ -560,7 +560,7 @@ def predict():
             cols_so_items = [
                 'Sales Document', 'Article', 'Material Description',
                 'Requirement quantity (EINHEIT)', 'Requirement date_str',
-                'Initial_Stock_MB52', 'Fulfilled_Qty', 'Shortage_Qty'
+                'Initial_Stock_MB52', 'Opening_Stock_Balance', 'Fulfilled_Qty', 'Shortage_Qty'
             ]
             so_line_df = df_lines[cols_so_items].copy()
             so_line_df.rename(columns={
@@ -576,7 +576,8 @@ def predict():
                 'Ordered_Qty': 'sum',
                 'Fulfilled_Qty': 'sum',
                 'Shortage_Qty': 'sum',
-                'Initial_Stock_MB52': 'first'
+                'Initial_Stock_MB52': 'first',
+                'Opening_Stock_Balance': 'first'
             })
 
             so_line_df['Line_Status'] = np.where(
