@@ -1141,13 +1141,21 @@
         const soCtx = document.getElementById('soChart').getContext('2d');
         if (soChartInstance) soChartInstance.destroy();
 
+        const statusColorMap = {
+            'READY FOR FULL DELIVERY': '#10b981',
+            'PARTIAL DELIVERY RISK': '#fbbf24',
+            'UNFULFILLABLE (NO STOCK)': '#f43f5e'
+        };
+        const chartLabels = Object.keys(soCounts);
+        const chartColors = chartLabels.map(l => statusColorMap[l] || '#38bdf8');
+
         soChartInstance = new Chart(soCtx, {
             type: 'doughnut',
             data: {
-                labels: Object.keys(soCounts),
+                labels: chartLabels,
                 datasets: [{
                     data: Object.values(soCounts),
-                    backgroundColor: ['#10b981', '#fbbf24', '#f43f5e']
+                    backgroundColor: chartColors
                 }]
             },
             options: {
