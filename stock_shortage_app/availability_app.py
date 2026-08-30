@@ -584,11 +584,13 @@ def predict():
                 'Requirement date_str': 'Requirement_Date'
             }, inplace=True)
 
-            # Consolidate repeat line items per Sales Document, Article, Material Description, and Requirement Date
+            # Consolidate repeat line items per Sales Document and Article so each article appears exactly once
             so_line_df = so_line_df.groupby(
-                ['Sales Document', 'Article', 'Material Description', 'Requirement_Date'],
+                ['Sales Document', 'Article'],
                 as_index=False
             ).agg({
+                'Material Description': 'first',
+                'Requirement_Date': lambda x: f"{x.min()} → {x.max()}" if x.min() != x.max() else x.min(),
                 'Ordered_Qty': 'sum',
                 'Fulfilled_Qty': 'sum',
                 'Shortage_Qty': 'sum',
