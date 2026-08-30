@@ -560,13 +560,30 @@ def predict():
             cols_so_items = [
                 'Sales Document', 'Article', 'Material Description',
                 'Requirement quantity (EINHEIT)', 'Requirement date_str',
-                'Initial_Stock_MB52', 'Fulfilled_Qty', 'Shortage_Qty', 'Line_Status'
+                'Initial_Stock_MB52', 'Fulfilled_Qty', 'Shortage_Qty'
             ]
             so_line_df = df_lines[cols_so_items].copy()
             so_line_df.rename(columns={
                 'Requirement quantity (EINHEIT)': 'Ordered_Qty',
                 'Requirement date_str': 'Requirement_Date'
             }, inplace=True)
+
+            # Consolidate repeat line items per Sales Document, Article, Material Description, and Requirement Date
+            so_line_df = so_line_df.groupby(
+                ['Sales Document', 'Article', 'Material Description', 'Requirement_Date'],
+                as_index=False
+            ).agg({
+                'Ordered_Qty': 'sum',
+                'Fulfilled_Qty': 'sum',
+                'Shortage_Qty': 'sum',
+                'Initial_Stock_MB52': 'first'
+            })
+
+            so_line_df['Line_Status'] = np.where(
+                so_line_df['Shortage_Qty'].round(4) <= 0,
+                'FULLY COVERED ON TIME',
+                np.where(so_line_df['Fulfilled_Qty'].round(4) > 0, 'PARTIALLY COVERED', 'STOCKOUT / UNFULFILLABLE')
+            )
 
             so_line_dict = {}
             for so_id, group in so_line_df.groupby('Sales Document'):
