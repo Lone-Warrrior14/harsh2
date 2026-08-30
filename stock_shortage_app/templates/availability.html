@@ -706,12 +706,12 @@
         <div class="kpi-grid">
             <div class="kpi-card success">
                 <div class="kpi-title">Initial Stock Value (MB52)</div>
-                <div class="kpi-value" id="kpiStock">₹ 0.00</div>
+                <div class="kpi-value" id="kpiStock">SAR 0.00</div>
                 <div class="kpi-sub" id="kpiStockSub">Total Unrestricted Value</div>
             </div>
             <div class="kpi-card">
                 <div class="kpi-title">Forecast Demand Value (COHV)</div>
-                <div class="kpi-value" id="kpiDemand">₹ 0.00</div>
+                <div class="kpi-value" id="kpiDemand">SAR 0.00</div>
                 <div class="kpi-sub" id="kpiDemandSub">Total Requirement Value</div>
             </div>
             <div class="kpi-card critical">
@@ -1123,7 +1123,7 @@
         dashboardView.style.display = 'block';
         const kpis = data.kpis;
 
-        const fmtCurr = (val) => '₹ ' + (val || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        const fmtCurr = (val) => 'SAR ' + (val || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
 
         document.getElementById('kpiStock').innerText = fmtCurr(kpis.total_stock_val);
         document.getElementById('kpiStockSub').innerText = `${(kpis.total_stock || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})} Unrestricted Units`;
