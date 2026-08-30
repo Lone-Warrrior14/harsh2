@@ -9,6 +9,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         :root {
@@ -733,7 +734,13 @@
         <!-- Charts Grid -->
         <div class="charts-grid">
             <div class="chart-card">
-                <h3>Top Material Descriptions at Stockout Risk & Shortage Qty</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                    <h3 style="margin: 0; font-size: 14px;">Top Material Descriptions at Stockout Risk & Shortage Qty</h3>
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                        <button id="toggleScaleBtn" class="filter-btn" style="padding: 4px 10px; font-size: 11px;">📊 Log Scale</button>
+                        <button id="resetZoomBtn" class="filter-btn" style="padding: 4px 10px; font-size: 11px;">🔍 Reset Zoom</button>
+                    </div>
+                </div>
                 <div class="chart-wrapper">
                     <canvas id="riskChart"></canvas>
                 </div>
@@ -910,6 +917,30 @@
     let activeModalFilter = 'all';
     let riskChartInstance = null;
     let soChartInstance = null;
+    let isLogScale = false;
+
+    const toggleScaleBtn = document.getElementById('toggleScaleBtn');
+    const resetZoomBtn = document.getElementById('resetZoomBtn');
+
+    if (toggleScaleBtn) {
+        toggleScaleBtn.addEventListener('click', () => {
+            isLogScale = !isLogScale;
+            toggleScaleBtn.innerText = isLogScale ? '📊 Linear Scale' : '📊 Log Scale';
+            toggleScaleBtn.style.background = isLogScale ? 'var(--accent-purple)' : '';
+            if (riskChartInstance) {
+                riskChartInstance.options.scales.y.type = isLogScale ? 'logarithmic' : 'linear';
+                riskChartInstance.update();
+            }
+        });
+    }
+
+    if (resetZoomBtn) {
+        resetZoomBtn.addEventListener('click', () => {
+            if (riskChartInstance && riskChartInstance.resetZoom) {
+                riskChartInstance.resetZoom();
+            }
+        });
+    }
 
     viewByMaterial.addEventListener('click', () => {
         viewByMaterial.classList.add('active');
@@ -1130,10 +1161,30 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
-                plugins: { legend: { labels: { color: '#94a3b8' } } },
+                plugins: {
+                    legend: { labels: { color: '#94a3b8' } },
+                    zoom: {
+                        pan: {
+                            enabled: true,
+                            mode: 'xy'
+                        },
+                        zoom: {
+                            wheel: {
+                                enabled: true
+                            },
+                            pinch: {
+                                enabled: true
+                            },
+                            mode: 'xy'
+                        }
+                    }
+                },
                 scales: {
                     x: { ticks: { color: '#94a3b8', font: { size: 10 } } },
-                    y: { ticks: { color: '#94a3b8' } }
+                    y: {
+                        type: isLogScale ? 'logarithmic' : 'linear',
+                        ticks: { color: '#94a3b8' }
+                    }
                 }
             }
         });
