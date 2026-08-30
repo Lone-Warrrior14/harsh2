@@ -175,6 +175,11 @@ def calculate_availability_predictions(file_mb52, cohv_files):
     article_summary['Total_Shortage_Qty'] = article_summary['Total_Shortage_Qty'].fillna(0)
     article_summary['Total_Orders_Count'] = article_summary['Total_Orders_Count'].fillna(0).astype(int)
 
+    unfulfilled_art = df_lines[df_lines['Shortage_Qty'] > 0.0001].groupby('Article')['Sales Document'].nunique().reset_index()
+    unfulfilled_art.rename(columns={'Sales Document': 'Unfulfilled_Orders_Count'}, inplace=True)
+    article_summary = pd.merge(article_summary, unfulfilled_art, on='Article', how='left')
+    article_summary['Unfulfilled_Orders_Count'] = article_summary['Unfulfilled_Orders_Count'].fillna(0).astype(int)
+
     # Exclude inactive items (articles with 0 MB52 stock and 0 COHV demand)
     article_summary = article_summary[~((article_summary['Initial_Stock_MB52'] == 0) & (article_summary['Total_Future_Demand'] == 0))].copy()
 
@@ -252,6 +257,17 @@ def calculate_availability_predictions(file_mb52, cohv_files):
         np.minimum(100.0, (mat_summary['Total_Fulfilled_Qty'] / mat_summary['Total_Future_Demand']) * 100.0),
         100.0
     ).round(1)
+
+    mat_orders = df_lines.groupby('Material Description', as_index=False).agg(
+        Total_Orders_Count=('Sales Document', 'nunique')
+    )
+    mat_unfulfilled = df_lines[df_lines['Shortage_Qty'] > 0.0001].groupby('Material Description', as_index=False).agg(
+        Unfulfilled_Orders_Count=('Sales Document', 'nunique')
+    )
+    mat_summary = pd.merge(mat_summary, mat_orders, on='Material Description', how='left')
+    mat_summary = pd.merge(mat_summary, mat_unfulfilled, on='Material Description', how='left')
+    mat_summary['Total_Orders_Count'] = mat_summary['Total_Orders_Count'].fillna(0).astype(int)
+    mat_summary['Unfulfilled_Orders_Count'] = mat_summary['Unfulfilled_Orders_Count'].fillna(0).astype(int)
 
     mat_depletion_results = mat_summary.apply(get_depletion_info, axis=1)
     mat_summary['Stock_Depletion_Date'] = [r[0] for r in mat_depletion_results]

@@ -1171,6 +1171,7 @@
                     <th>Future Demand</th>
                     <th>Net Balance</th>
                     <th>Coverage %</th>
+                    <th>Unfulfilled Orders</th>
                     <th style="color:#f43f5e;">📅 Stock Depletion Date</th>
                     <th>Runway / Days</th>
                     <th>Status</th>
@@ -1185,6 +1186,7 @@
                     <th>Future Demand</th>
                     <th>Net Balance</th>
                     <th>Coverage %</th>
+                    <th>Unfulfilled Orders</th>
                     <th style="color:#f43f5e;">📅 Stock Depletion Date</th>
                     <th>Runway / Days</th>
                     <th>Status</th>
@@ -1194,7 +1196,7 @@
 
         tbody.innerHTML = '';
         if (rows.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; color: var(--text-muted);">No matching predictions found.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color: var(--text-muted);">No matching predictions found.</td></tr>`;
             return;
         }
 
@@ -1209,6 +1211,18 @@
                 stockDisplay = `<span style="color:#f43f5e; font-weight:600;">0</span>`;
             } else {
                 stockDisplay = `<span style="color:#10b981; font-weight:600;">${r.Initial_Stock_MB52.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</span>`;
+            }
+
+            // Unfulfilled Orders Formatting
+            let unfulfilledDisplay = '';
+            const unfulfilledCount = r.Unfulfilled_Orders_Count || 0;
+            const totalCount = r.Total_Orders_Count || 0;
+            const searchKey = mode === 'material' ? (r['Material Description'] || '') : (r.Article || '');
+
+            if (unfulfilledCount > 0) {
+                unfulfilledDisplay = `<span style="color:#f43f5e; font-weight:700; cursor:pointer;" title="Click to view unfulfilled sales orders" onclick="searchSoByArticle('${searchKey}')">⚠️ ${unfulfilledCount} / ${totalCount} SOs</span>`;
+            } else {
+                unfulfilledDisplay = `<span style="color:#10b981; font-weight:600;">✅ 0 / ${totalCount} SOs</span>`;
             }
 
             // Depletion Date Display Formatting
@@ -1236,12 +1250,13 @@
             const tr = document.createElement('tr');
             if (mode === 'material') {
                 tr.innerHTML = `
-                    <td style="font-weight:600; color:var(--accent-cyan);">${r['Material Description']}</td>
+                    <td style="font-weight:600; color:var(--accent-cyan); cursor:pointer;" title="Click to filter Sales Orders by ${r['Material Description']}" onclick="searchSoByArticle('${r['Material Description']}')">🔍 ${r['Material Description']}</td>
                     <td style="font-size:11px; color:var(--text-muted);">${r.Associated_Articles || '-'}</td>
                     <td>${stockDisplay}</td>
                     <td>${r.Total_Future_Demand.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</td>
                     <td style="color: ${r.Net_Projected_Balance < 0 ? '#f43f5e' : '#10b981'}; font-weight:600;">${r.Net_Projected_Balance.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</td>
                     <td>${r.Stock_Coverage_Pct}%</td>
+                    <td>${unfulfilledDisplay}</td>
                     <td>${depletionDisplay}</td>
                     <td>${daysDisplay}</td>
                     <td><span class="badge ${badgeClass}">${r.Status}</span></td>
@@ -1254,6 +1269,7 @@
                     <td>${r.Total_Future_Demand.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</td>
                     <td style="color: ${r.Net_Projected_Balance < 0 ? '#f43f5e' : '#10b981'}; font-weight:600;">${r.Net_Projected_Balance.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</td>
                     <td>${r.Stock_Coverage_Pct}%</td>
+                    <td>${unfulfilledDisplay}</td>
                     <td>${depletionDisplay}</td>
                     <td>${daysDisplay}</td>
                     <td><span class="badge ${badgeClass}">${r.Status}</span></td>
