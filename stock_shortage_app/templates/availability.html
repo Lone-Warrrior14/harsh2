@@ -737,8 +737,8 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
                     <h3 style="margin: 0; font-size: 14px;">Top Material Descriptions at Stockout Risk & Shortage Qty</h3>
                     <div style="display: flex; gap: 6px; align-items: center;">
-                        <button id="toggleScaleBtn" class="filter-btn" style="padding: 4px 10px; font-size: 11px;">📊 Log Scale</button>
-                        <button id="resetZoomBtn" class="filter-btn" style="padding: 4px 10px; font-size: 11px;">🔍 Reset Zoom</button>
+                        <button id="toggleScaleBtn" class="chart-ctrl-btn" style="padding: 4px 10px; font-size: 11px;">📊 Log Scale</button>
+                        <button id="resetZoomBtn" class="chart-ctrl-btn" style="padding: 4px 10px; font-size: 11px;">🔍 Reset Zoom</button>
                     </div>
                 </div>
                 <div class="chart-wrapper">
@@ -1500,11 +1500,11 @@
     });
 
     let activeStatusFilter = 'all';
-    document.querySelectorAll('.filter-btn:not(.so-filter-btn):not(.modal-tab-btn)').forEach(btn => {
+    document.querySelectorAll('.filter-btn[data-filter]').forEach(btn => {
         btn.addEventListener('click', () => {
-            document.querySelectorAll('.filter-btn:not(.so-filter-btn):not(.modal-tab-btn)').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.filter-btn[data-filter]').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            activeStatusFilter = btn.getAttribute('data-filter');
+            activeStatusFilter = btn.getAttribute('data-filter') || 'all';
             applyMainFilter();
         });
     });
