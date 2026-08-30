@@ -453,6 +453,24 @@
             border-color: var(--accent-cyan);
         }
 
+        .so-filter-btn[data-so-filter="READY FOR FULL DELIVERY"].active {
+            background: rgba(16, 185, 129, 0.25) !important;
+            color: #10b981 !important;
+            border-color: #10b981 !important;
+        }
+
+        .so-filter-btn[data-so-filter="PARTIAL DELIVERY RISK"].active {
+            background: rgba(251, 191, 36, 0.25) !important;
+            color: #fbbf24 !important;
+            border-color: #fbbf24 !important;
+        }
+
+        .so-filter-btn[data-so-filter="UNFULFILLABLE (NO STOCK)"].active {
+            background: rgba(244, 63, 94, 0.25) !important;
+            color: #f43f5e !important;
+            border-color: #f43f5e !important;
+        }
+
         .table-responsive {
             overflow-x: auto;
             max-height: 460px;
@@ -1230,7 +1248,7 @@
                 `;
             } else {
                 tr.innerHTML = `
-                    <td style="font-weight: 600; color: var(--accent-cyan);">${r.Article}</td>
+                    <td style="font-weight: 600; color: var(--accent-cyan); cursor:pointer;" title="Click to filter Sales Orders by Article ${r.Article}" onclick="searchSoByArticle('${r.Article}')">🔍 ${r.Article}</td>
                     <td>${r['Material Description'] || r.Article}</td>
                     <td>${stockDisplay}</td>
                     <td>${r.Total_Future_Demand.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</td>
@@ -1353,7 +1371,7 @@
             }
             const availAtDate = (item.Opening_Stock_Balance !== undefined && item.Opening_Stock_Balance !== null) ? Math.max(0, item.Opening_Stock_Balance) : item.Initial_Stock_MB52;
             tr.innerHTML = `
-                <td style="font-weight:600; color:var(--accent-cyan);">${item.Article}</td>
+                <td style="font-weight:600; color:var(--accent-cyan); cursor:pointer;" title="Click to filter Sales Orders containing Article ${item.Article}" onclick="searchSoByArticle('${item.Article}')">🔍 ${item.Article}</td>
                 <td>${item['Material Description'] || item.Article}</td>
                 <td>${item.Requirement_Date || 'N/A'}</td>
                 <td>${item.Ordered_Qty.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</td>
@@ -1364,6 +1382,19 @@
             `;
             tbody.appendChild(tr);
         });
+    }
+
+    function searchSoByArticle(articleId) {
+        document.getElementById('soModal').style.display = 'none';
+        const soSearch = document.getElementById('soSearch');
+        if (soSearch) {
+            soSearch.value = articleId;
+            applySoFilter();
+            const soCard = document.getElementById('soTableBody').closest('.table-card');
+            if (soCard) {
+                soCard.scrollIntoView({ behavior: 'smooth' });
+            }
+        }
     }
 
     document.querySelectorAll('.modal-tab-btn').forEach(btn => {
@@ -1436,7 +1467,15 @@
         const search = document.getElementById('soSearch').value.toLowerCase().trim();
         const filtered = globalSoRows.filter(r => {
             const matchesStatus = activeSoFilter === 'all' || r.SO_Status === activeSoFilter;
-            const matchesSearch = !search || String(r['Sales Document']).toLowerCase().includes(search);
+            let matchesSearch = !search || String(r['Sales Document']).toLowerCase().includes(search);
+            if (!matchesSearch && search) {
+                const cleanKey = cleanSoKey(r['Sales Document']);
+                const lines = globalSoLineDict[cleanKey] || globalSoLineDict[String(r['Sales Document'])] || [];
+                matchesSearch = lines.some(l =>
+                    (l.Article && String(l.Article).toLowerCase().includes(search)) ||
+                    (l['Material Description'] && String(l['Material Description']).toLowerCase().includes(search))
+                );
+            }
             return matchesStatus && matchesSearch;
         });
         renderSoTable(filtered);
