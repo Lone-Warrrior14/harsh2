@@ -705,14 +705,14 @@
         <!-- KPI Row -->
         <div class="kpi-grid">
             <div class="kpi-card success">
-                <div class="kpi-title">Initial Stock (MB52)</div>
-                <div class="kpi-value" id="kpiStock">0</div>
-                <div class="kpi-sub">Total Unrestricted Units</div>
+                <div class="kpi-title">Initial Stock Value (MB52)</div>
+                <div class="kpi-value" id="kpiStock">₹ 0.00</div>
+                <div class="kpi-sub" id="kpiStockSub">Total Unrestricted Value</div>
             </div>
             <div class="kpi-card">
-                <div class="kpi-title">Forecast Demand (COHV)</div>
-                <div class="kpi-value" id="kpiDemand">0</div>
-                <div class="kpi-sub">Total Requirement Qty</div>
+                <div class="kpi-title">Forecast Demand Value (COHV)</div>
+                <div class="kpi-value" id="kpiDemand">₹ 0.00</div>
+                <div class="kpi-sub" id="kpiDemandSub">Total Requirement Value</div>
             </div>
             <div class="kpi-card critical">
                 <div class="kpi-title">Items at Stockout Risk</div>
@@ -1123,10 +1123,16 @@
         dashboardView.style.display = 'block';
         const kpis = data.kpis;
 
-        document.getElementById('kpiStock').innerText = kpis.total_stock.toLocaleString();
-        document.getElementById('kpiDemand').innerText = kpis.total_demand.toLocaleString();
+        const fmtCurr = (val) => '₹ ' + (val || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+        document.getElementById('kpiStock').innerText = fmtCurr(kpis.total_stock_val);
+        document.getElementById('kpiStockSub').innerText = `${(kpis.total_stock || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})} Unrestricted Units`;
+
+        document.getElementById('kpiDemand').innerText = fmtCurr(kpis.total_demand_val);
+        document.getElementById('kpiDemandSub').innerText = `${(kpis.total_demand || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})} Requirement Qty`;
+
         document.getElementById('kpiRisk').innerText = (kpis.critical_count + kpis.risk_count).toLocaleString();
-        document.getElementById('kpiRiskSub').innerText = `${kpis.critical_count} Critical 0-Stock | ${kpis.risk_count} Risk`;
+        document.getElementById('kpiRiskSub').innerText = `${kpis.critical_count} Critical 0-Stock | Shortage: ${fmtCurr(kpis.total_shortage_val)}`;
         document.getElementById('kpiFulfillment').innerText = kpis.fulfillment_rate + '%';
         document.getElementById('kpiRunout').innerText = kpis.earliest_depletion;
 

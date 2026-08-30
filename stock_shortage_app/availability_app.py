@@ -16,6 +16,8 @@ def normalize_cols(df):
         c_lower = col.lower().replace(' ', '').replace('_', '').replace('-', '')
         if c_lower in ['article', 'material', 'materialnumber', 'item', 'matnr']:
             col_map[col] = 'Article'
+        elif 'value' in c_lower and 'unrestricted' in c_lower:
+            col_map[col] = 'Value Unrestricted'
         elif c_lower in ['unrestricted', 'unrestrictedstock', 'unrestricteduse', 'labst', 'available', 'availablestock']:
             col_map[col] = 'Unrestricted'
         elif c_lower in ['salesdocument', 'salesdoc', 'so', 'salesorder', 'vbeln']:
@@ -65,6 +67,10 @@ def calculate_availability_predictions(file_mb52, cohv_files):
 
     df_mb52['Article'] = df_mb52['Article'].astype(str).str.strip().str.replace(r'\.0$', '', regex=True).str.lstrip('0')
     df_mb52['Unrestricted'] = pd.to_numeric(df_mb52['Unrestricted'], errors='coerce').fillna(0)
+    if 'Value Unrestricted' in df_mb52.columns:
+        df_mb52['Value Unrestricted'] = pd.to_numeric(df_mb52['Value Unrestricted'], errors='coerce').fillna(0)
+    else:
+        df_mb52['Value Unrestricted'] = 0.0
 
     # 2. Read and combine COHV requirement files
     df_cohv_list = []
@@ -106,9 +112,16 @@ def calculate_availability_predictions(file_mb52, cohv_files):
     df_cohv['Requirement_Date_Clean'] = df_cohv['Requirement date'].fillna(pd.Timestamp('2099-12-31'))
     df_cohv = df_cohv.sort_values(by=['Article', 'Requirement_Date_Clean', 'Sales Document']).reset_index(drop=True)
 
-    # MB52 stock aggregation by Article
-    stock_summary = df_mb52.groupby('Article')['Unrestricted'].sum().reset_index()
-    stock_summary.rename(columns={'Unrestricted': 'Initial_Stock_MB52'}, inplace=True)
+    # MB52 stock aggregation by Article with monetary valuation
+    stock_summary = df_mb52.groupby('Article', as_index=False).agg(
+        Initial_Stock_MB52=('Unrestricted', 'sum'),
+        Initial_Stock_Value=('Value Unrestricted', 'sum')
+    )
+    stock_summary['Unit_Price'] = np.where(
+        stock_summary['Initial_Stock_MB52'] > 0,
+        stock_summary['Initial_Stock_Value'] / stock_summary['Initial_Stock_MB52'],
+        0.0
+    )
 
     # 3. Merge MB52 Stock onto requirement lines
     df_lines = pd.merge(df_cohv, stock_summary, on='Article', how='left')
@@ -174,6 +187,11 @@ def calculate_availability_predictions(file_mb52, cohv_files):
     article_summary['Total_Fulfilled_Qty'] = article_summary['Total_Fulfilled_Qty'].fillna(0)
     article_summary['Total_Shortage_Qty'] = article_summary['Total_Shortage_Qty'].fillna(0)
     article_summary['Total_Orders_Count'] = article_summary['Total_Orders_Count'].fillna(0).astype(int)
+
+    article_summary['Initial_Stock_Value'] = article_summary['Initial_Stock_Value'].fillna(0.0)
+    article_summary['Unit_Price'] = article_summary['Unit_Price'].fillna(0.0)
+    article_summary['Total_Demand_Value'] = (article_summary['Total_Future_Demand'] * article_summary['Unit_Price']).round(2)
+    article_summary['Total_Shortage_Value'] = (article_summary['Total_Shortage_Qty'] * article_summary['Unit_Price']).round(2)
 
     unfulfilled_art = df_lines[df_lines['Shortage_Qty'] > 0.0001].groupby('Article')['Sales Document'].nunique().reset_index()
     unfulfilled_art.rename(columns={'Sales Document': 'Unfulfilled_Orders_Count'}, inplace=True)
@@ -531,8 +549,11 @@ def predict():
 
         elif req_format == 'json' or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             tot_stock = float(art_summary['Initial_Stock_MB52'].sum())
+            tot_stock_val = float(art_summary['Initial_Stock_Value'].sum())
             tot_demand = float(art_summary['Total_Future_Demand'].sum())
+            tot_demand_val = float(art_summary['Total_Demand_Value'].sum())
             tot_shortage = float(art_summary['Total_Shortage_Qty'].sum())
+            tot_shortage_val = float(art_summary['Total_Shortage_Value'].sum())
             
             critical_count = int((art_summary['Status'] == 'CRITICAL STOCKOUT').sum())
             risk_count = int((art_summary['Status'] == 'STOCKOUT RISK').sum())
@@ -613,8 +634,11 @@ def predict():
                 'success': True,
                 'kpis': {
                     'total_stock': tot_stock,
+                    'total_stock_val': tot_stock_val,
                     'total_demand': tot_demand,
+                    'total_demand_val': tot_demand_val,
                     'total_shortage': tot_shortage,
+                    'total_shortage_val': tot_shortage_val,
                     'fulfillment_rate': overall_fulfillment,
                     'critical_count': critical_count,
                     'risk_count': risk_count,
