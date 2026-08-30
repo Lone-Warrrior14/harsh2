@@ -63,7 +63,7 @@ def calculate_availability_predictions(file_mb52, cohv_files):
     if 'Material Description' in df_mb52.columns:
         df_mb52 = df_mb52[~df_mb52['Material Description'].astype(str).str.contains('gls', case=False, na=False)].copy()
 
-    df_mb52['Article'] = df_mb52['Article'].astype(str).str.strip()
+    df_mb52['Article'] = df_mb52['Article'].astype(str).str.strip().str.replace(r'\.0$', '', regex=True).str.lstrip('0')
     df_mb52['Unrestricted'] = pd.to_numeric(df_mb52['Unrestricted'], errors='coerce').fillna(0)
 
     # 2. Read and combine COHV requirement files
@@ -98,7 +98,7 @@ def calculate_availability_predictions(file_mb52, cohv_files):
         df_cohv = df_cohv[~df_cohv['Material Description'].astype(str).str.contains('gls', case=False, na=False)].copy()
 
     df_cohv = df_cohv.dropna(subset=['Article']).copy()
-    df_cohv['Article'] = df_cohv['Article'].astype(str).str.strip()
+    df_cohv['Article'] = df_cohv['Article'].astype(str).str.strip().str.replace(r'\.0$', '', regex=True).str.lstrip('0')
     df_cohv['Sales Document'] = df_cohv['Sales Document'].astype(str).str.strip().str.replace(r'\.0$', '', regex=True)
     df_cohv['Requirement quantity (EINHEIT)'] = pd.to_numeric(df_cohv['Requirement quantity (EINHEIT)'], errors='coerce').fillna(0)
     df_cohv['Requirement date'] = pd.to_datetime(df_cohv['Requirement date'], errors='coerce')
