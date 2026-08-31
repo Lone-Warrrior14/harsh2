@@ -1060,63 +1060,40 @@
         }
     }
 
-    downloadBtn.addEventListener('click', () => {
-        hideError();
-        if (!globalArtRows || globalArtRows.length === 0) {
-            showError("Please upload MB52 and COHV files and click 'Run Predictions' first before downloading the report.");
+    downloadBtn.addEventListener('click', async () => {
+        if (!mb52Input.files[0] || cohvInput.files.length === 0) {
+            showError("Please select MB52 file and COHV files before downloading.");
             return;
         }
+        hideError();
+
+        const formData = new FormData(predictorForm);
+        formData.append('format', 'excel');
+
+        downloadBtn.disabled = true;
+        downloadBtn.innerText = '⏳ Generating Excel...';
 
         try {
-            downloadBtn.disabled = true;
-            downloadBtn.innerText = '⏳ Exporting Excel...';
-            
-            if (typeof XLSX === 'undefined') {
-                throw new Error("XLSX export library failed to load. Please check your internet connection and refresh.");
+            const response = await fetch('/predict', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const text = await response.text();
+                throw new Error(text);
             }
 
-            const wb = XLSX.utils.book_new();
-
-            // 1. Material Description Forecast
-            if (globalMatRows && globalMatRows.length > 0) {
-                const wsMat = XLSX.utils.json_to_sheet(globalMatRows);
-                XLSX.utils.book_append_sheet(wb, wsMat, "Material_Forecast");
-            }
-
-            // 2. Article Predictions
-            if (globalArtRows && globalArtRows.length > 0) {
-                const wsArt = XLSX.utils.json_to_sheet(globalArtRows);
-                XLSX.utils.book_append_sheet(wb, wsArt, "Article_Forecast");
-            }
-
-            // 3. Sales Order Fulfillment
-            if (globalSoRows && globalSoRows.length > 0) {
-                const wsSo = XLSX.utils.json_to_sheet(globalSoRows);
-                XLSX.utils.book_append_sheet(wb, wsSo, "Sales_Order_Fulfillment");
-            }
-
-            // 4. Item Shortage Impact Report
-            if (globalItemImpactDict && Object.keys(globalItemImpactDict).length > 0) {
-                const impactRows = [];
-                Object.values(globalItemImpactDict).forEach(item => {
-                    impactRows.push({
-                        'Material Description': item.Material_Description,
-                        'Article': item.Article,
-                        'Impacted SICs Count': item.Impacted_SICs_Count,
-                        'Total Demand': item.Total_Demand || 0,
-                        'Total Item Shortage': item.Total_Shortage_Qty,
-                        'Impacted Sales Orders': (item.Impacted_Sales_Orders || []).map(so => so['Sales Document']).join(', ')
-                    });
-                });
-                if (impactRows.length > 0) {
-                    const wsImpact = XLSX.utils.json_to_sheet(impactRows);
-                    XLSX.utils.book_append_sheet(wb, wsImpact, "Item_Shortage_Impact");
-                }
-            }
-
-            XLSX.writeFile(wb, `Product_Availability_Prediction_${new Date().toISOString().slice(0,10)}.xlsx`);
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Product_Availability_Prediction_${new Date().toISOString().slice(0,10)}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
         } catch (err) {
-            showError("Export failed: " + err.message);
+            showError("Download failed: " + err.message);
         } finally {
             downloadBtn.disabled = false;
             downloadBtn.innerText = '📥 Download Full Excel Report';
