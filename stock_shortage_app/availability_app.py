@@ -494,11 +494,12 @@ def generate_excel_report(article_summary, mat_summary, so_summary, df_lines):
             impact_df = df_shortage.groupby(['Material Description', 'Article'], as_index=False).agg(
                 Impacted_SICs_Count=('Sales Document', 'nunique'),
                 Impacted_Sales_Orders=('Sales Document', lambda x: ', '.join(sorted([str(i) for i in x.unique() if pd.notna(i)]))),
+                Total_Demand=('Requirement quantity (EINHEIT)', 'sum'),
                 Total_Item_Shortage=('Shortage_Qty', 'sum'),
                 Initial_Available_Stock=('Initial_Stock_MB52', 'first')
             ).sort_values(by=['Impacted_SICs_Count', 'Total_Item_Shortage'], ascending=[False, False])
         else:
-            impact_df = pd.DataFrame(columns=['Material Description', 'Article', 'Impacted_SICs_Count', 'Impacted_Sales_Orders', 'Total_Item_Shortage', 'Initial_Available_Stock'])
+            impact_df = pd.DataFrame(columns=['Material Description', 'Article', 'Impacted_SICs_Count', 'Impacted_Sales_Orders', 'Total_Demand', 'Total_Item_Shortage', 'Initial_Available_Stock'])
 
         impact_df.to_excel(writer, sheet_name='Item_Shortage_Impact_Report', index=False)
         ws_impact = writer.sheets['Item_Shortage_Impact_Report']
