@@ -491,14 +491,25 @@ def generate_excel_report(article_summary, mat_summary, so_summary, df_lines):
         # Sheet 6: Item-to-Sales Order Shortage Impact Report
         # Groups shortages by Material/Article to detail affected Sales Orders (SICs)
         if not df_shortage.empty:
-            impact_df = df_shortage.groupby(['Material Description', 'Article'], as_index=False).agg(
+            # Overall demand per item from all lines (both fulfilled and short)
+            total_item_demand = df_lines.groupby(['Material Description', 'Article'], as_index=False).agg(
+                Total_Demand_Orders=('Sales Document', 'nunique'),
+                Total_Demand_Qty=('Requirement quantity (EINHEIT)', 'sum'),
+                Initial_Available_Stock=('Initial_Stock_MB52', 'first')
+            )
+            
+            # Shortage specific metrics per item
+            shortage_item_summary = df_shortage.groupby(['Material Description', 'Article'], as_index=False).agg(
                 Impacted_SICs_Count=('Sales Document', 'nunique'),
                 Impacted_Sales_Orders=('Sales Document', lambda x: ', '.join(sorted([str(i) for i in x.unique() if pd.notna(i)]))),
-                Total_Demand_Orders=('Sales Document', 'count'),
-                Total_Demand_Qty=('Requirement quantity (EINHEIT)', 'sum'),
-                Total_Item_Shortage=('Shortage_Qty', 'sum'),
-                Initial_Available_Stock=('Initial_Stock_MB52', 'first')
-            ).sort_values(by=['Impacted_SICs_Count', 'Total_Item_Shortage'], ascending=[False, False])
+                Total_Item_Shortage=('Shortage_Qty', 'sum')
+            )
+            
+            impact_df = pd.merge(shortage_item_summary, total_item_demand, on=['Material Description', 'Article'], how='left')
+            impact_df = impact_df[[
+                'Material Description', 'Article', 'Impacted_SICs_Count', 'Impacted_Sales_Orders',
+                'Total_Demand_Orders', 'Total_Demand_Qty', 'Total_Item_Shortage', 'Initial_Available_Stock'
+            ]].sort_values(by=['Impacted_SICs_Count', 'Total_Item_Shortage'], ascending=[False, False])
         else:
             impact_df = pd.DataFrame(columns=['Material Description', 'Article', 'Impacted_SICs_Count', 'Impacted_Sales_Orders', 'Total_Demand_Orders', 'Total_Demand_Qty', 'Total_Item_Shortage', 'Initial_Available_Stock'])
 
@@ -708,12 +719,20 @@ def predict():
                     ).fillna('')
                     impacted_sos = grp_clean.to_dict(orient='records')
                     
+                    # Fetch total demand across all lines (both fulfilled and short)
+                    all_item_lines = df_lines[df_lines['Article'] == art_id]
+                    if all_item_lines.empty:
+                        all_item_lines = df_lines[df_lines['Material Description'] == mat_desc]
+                    
+                    tot_orders_count = int(all_item_lines['Sales Document'].nunique()) if not all_item_lines.empty else len(grp['Sales Document'].unique())
+                    tot_demand_qty_val = float(all_item_lines['Requirement quantity (EINHEIT)'].sum()) if not all_item_lines.empty else float(grp['Requirement quantity (EINHEIT)'].sum())
+
                     impact_obj = {
                         'Material_Description': str(mat_desc) if pd.notna(mat_desc) else '',
                         'Article': str(art_id) if pd.notna(art_id) else '',
                         'Impacted_SICs_Count': len(grp['Sales Document'].unique()),
-                        'Total_Demand_Orders': int(grp['Sales Document'].count()),
-                        'Total_Demand_Qty': float(grp['Requirement quantity (EINHEIT)'].sum()),
+                        'Total_Demand_Orders': tot_orders_count,
+                        'Total_Demand_Qty': tot_demand_qty_val,
                         'Total_Shortage_Qty': float(grp['Shortage_Qty'].sum()),
                         'Impacted_Sales_Orders': impacted_sos
                     }
