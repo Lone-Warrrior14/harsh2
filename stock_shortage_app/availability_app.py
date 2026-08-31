@@ -617,7 +617,7 @@ def predict():
             return send_file(
                 excel_file,
                 as_attachment=True,
-                download_name=f"Product_Availability_Review_{datetime.datetime.now().strftime('%Y-%m-%d')}.xlsx",
+                download_name=f"Material_Availability_Review_{datetime.datetime.now().strftime('%Y-%m-%d')}.xlsx",
                 mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
