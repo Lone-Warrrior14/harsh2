@@ -700,13 +700,14 @@ def predict():
             item_impact_dict = {}
             if not df_shortage_lines.empty:
                 for (mat_desc, art_id), grp in df_shortage_lines.groupby(['Material Description', 'Article']):
-                    impacted_sos = grp[['Sales Document', 'Requirement date_str', 'Requirement quantity (EINHEIT)', 'Fulfilled_Qty', 'Shortage_Qty']].rename(
+                    grp_clean = grp[['Sales Document', 'Requirement date_str', 'Requirement quantity (EINHEIT)', 'Fulfilled_Qty', 'Shortage_Qty']].rename(
                         columns={'Requirement date_str': 'Requirement_Date', 'Requirement quantity (EINHEIT)': 'Ordered_Qty'}
-                    ).to_dict(orient='records')
+                    ).fillna('')
+                    impacted_sos = grp_clean.to_dict(orient='records')
                     
                     impact_obj = {
-                        'Material_Description': mat_desc,
-                        'Article': art_id,
+                        'Material_Description': str(mat_desc) if pd.notna(mat_desc) else '',
+                        'Article': str(art_id) if pd.notna(art_id) else '',
                         'Impacted_SICs_Count': len(grp['Sales Document'].unique()),
                         'Total_Shortage_Qty': float(grp['Shortage_Qty'].sum()),
                         'Impacted_Sales_Orders': impacted_sos
@@ -715,7 +716,7 @@ def predict():
                     if mat_desc not in item_impact_dict:
                         item_impact_dict[mat_desc] = impact_obj
 
-            return jsonify({
+            response_dict = {
                 'success': True,
                 'kpis': {
                     'total_stock': tot_stock,
@@ -739,7 +740,25 @@ def predict():
                 'so_table_rows': so_table_rows,
                 'so_line_dict': so_line_dict,
                 'item_impact_dict': item_impact_dict
-            })
+            }
+
+            def clean_nan(obj):
+                if isinstance(obj, float):
+                    if np.isnan(obj) or np.isinf(obj):
+                        return 0.0
+                    return obj
+                elif isinstance(obj, dict):
+                    return {k: clean_nan(v) for k, v in obj.items()}
+                elif isinstance(obj, list):
+                    return [clean_nan(v) for v in obj]
+                return obj
+
+            sanitized_response = clean_nan(response_dict)
+            return app.response_class(
+                response=json.dumps(sanitized_response),
+                status=200,
+                mimetype='application/json'
+            )
         
         else:
             excel_file = generate_excel_report(art_summary, mat_summary, so_summary, df_lines)
