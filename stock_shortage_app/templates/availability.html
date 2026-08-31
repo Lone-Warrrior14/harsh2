@@ -906,7 +906,7 @@
         <div style="padding-bottom:12px;">
             <div class="kpi-grid" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 16px;">
                 <div class="kpi-card" style="padding:12px 16px; border-left:4px solid var(--accent-cyan);">
-                    <div class="kpi-title" style="font-size:11px;">Total Demand Quantity</div>
+                    <div class="kpi-title" style="font-size:11px;">Total Demand (No. of Orders)</div>
                     <div class="kpi-value" id="itemImpactTotalDemand" style="font-size:20px; color:var(--accent-cyan);">0</div>
                 </div>
                 <div class="kpi-card critical" style="padding:12px 16px;">
@@ -1421,7 +1421,7 @@
             document.getElementById('itemImpactSub').innerText = 'No Sales Orders (SICs) are currently impacted by shortages for this item.';
             document.getElementById('itemImpactBadge').className = 'badge badge-ok';
             document.getElementById('itemImpactBadge').innerText = 'NO SHORTAGE IMPACT';
-            document.getElementById('itemImpactTotalDemand').innerText = '0 Units';
+            document.getElementById('itemImpactTotalDemand').innerText = '0 Orders';
             document.getElementById('itemImpactSicCount').innerText = '0 SICs';
             document.getElementById('itemImpactTotalShortage').innerText = '0 Units';
             summaryBox.style.display = 'none';
@@ -1431,12 +1431,12 @@
             const uniqueSoDocs = [...new Set(impactData.Impacted_Sales_Orders.map(so => String(so['Sales Document'])))];
             currentImpactedSoListStr = uniqueSoDocs.join(', ');
 
-            const totDemand = impactData.Total_Demand !== undefined ? impactData.Total_Demand : (impactData.Impacted_Sales_Orders.reduce((sum, item) => sum + (parseFloat(item.Ordered_Qty) || 0), 0));
+            const totDemandOrders = impactData.Total_Demand_Orders !== undefined ? impactData.Total_Demand_Orders : impactData.Impacted_Sales_Orders.length;
 
             document.getElementById('itemImpactSub').innerText = `Material: ${impactData.Material_Description} (Article: ${impactData.Article})`;
             document.getElementById('itemImpactBadge').className = 'badge badge-critical';
             document.getElementById('itemImpactBadge').innerText = 'SHORTAGE IMPACTING SICs';
-            document.getElementById('itemImpactTotalDemand').innerText = `${totDemand.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})} Units`;
+            document.getElementById('itemImpactTotalDemand').innerText = `${totDemandOrders} Orders`;
             document.getElementById('itemImpactSicCount').innerText = `${impactData.Impacted_SICs_Count} Sales Orders`;
             document.getElementById('itemImpactTotalShortage').innerText = `${impactData.Total_Shortage_Qty.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})} Units Short`;
             
