@@ -711,6 +711,7 @@ def predict():
                         'Material_Description': str(mat_desc) if pd.notna(mat_desc) else '',
                         'Article': str(art_id) if pd.notna(art_id) else '',
                         'Impacted_SICs_Count': len(grp['Sales Document'].unique()),
+                        'Total_Demand': float(grp['Requirement quantity (EINHEIT)'].sum()),
                         'Total_Shortage_Qty': float(grp['Shortage_Qty'].sum()),
                         'Impacted_Sales_Orders': impacted_sos
                     }
