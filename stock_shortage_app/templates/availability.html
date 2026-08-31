@@ -1061,11 +1061,64 @@
     }
 
     downloadBtn.addEventListener('click', async () => {
+        hideError();
+        if (typeof XLSX !== 'undefined' && globalArtRows && globalArtRows.length > 0) {
+            try {
+                downloadBtn.disabled = true;
+                downloadBtn.innerText = '⏳ Exporting Excel...';
+                
+                const wb = XLSX.utils.book_new();
+
+                // 1. Material Description Forecast
+                if (globalMatRows && globalMatRows.length > 0) {
+                    const wsMat = XLSX.utils.json_to_sheet(globalMatRows);
+                    XLSX.utils.book_append_sheet(wb, wsMat, "Material_Forecast");
+                }
+
+                // 2. Article Predictions
+                if (globalArtRows && globalArtRows.length > 0) {
+                    const wsArt = XLSX.utils.json_to_sheet(globalArtRows);
+                    XLSX.utils.book_append_sheet(wb, wsArt, "Article_Forecast");
+                }
+
+                // 3. Sales Order Fulfillment
+                if (globalSoRows && globalSoRows.length > 0) {
+                    const wsSo = XLSX.utils.json_to_sheet(globalSoRows);
+                    XLSX.utils.book_append_sheet(wb, wsSo, "Sales_Order_Fulfillment");
+                }
+
+                // 4. Item Shortage Impact Report
+                if (globalItemImpactDict && Object.keys(globalItemImpactDict).length > 0) {
+                    const impactRows = [];
+                    Object.values(globalItemImpactDict).forEach(item => {
+                        impactRows.push({
+                            'Material Description': item.Material_Description,
+                            'Article': item.Article,
+                            'Impacted SICs Count': item.Impacted_SICs_Count,
+                            'Impacted Sales Orders': (item.Impacted_Sales_Orders || []).map(so => so['Sales Document']).join(', '),
+                            'Total Item Shortage': item.Total_Shortage_Qty
+                        });
+                    });
+                    if (impactRows.length > 0) {
+                        const wsImpact = XLSX.utils.json_to_sheet(impactRows);
+                        XLSX.utils.book_append_sheet(wb, wsImpact, "Item_Shortage_Impact");
+                    }
+                }
+
+                XLSX.writeFile(wb, `Product_Availability_Prediction_${new Date().toISOString().slice(0,10)}.xlsx`);
+            } catch (err) {
+                showError("Export failed: " + err.message);
+            } finally {
+                downloadBtn.disabled = false;
+                downloadBtn.innerText = '📥 Download Full Excel Report';
+            }
+            return;
+        }
+
         if (!mb52Input.files[0] || cohvInput.files.length === 0) {
             showError("Please select MB52 file and COHV files before downloading.");
             return;
         }
-        hideError();
 
         const formData = new FormData(predictorForm);
         formData.append('format', 'excel');
