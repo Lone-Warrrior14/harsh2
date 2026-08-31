@@ -612,7 +612,16 @@ def predict():
 
         req_format = request.form.get('format', request.args.get('format', 'excel'))
 
-        if req_format == 'so_excel':
+        if req_format == 'excel':
+            excel_file = generate_excel_report(mat_summary, art_summary, so_summary, df_lines)
+            return send_file(
+                excel_file,
+                as_attachment=True,
+                download_name=f"Product_Availability_Review_{datetime.datetime.now().strftime('%Y-%m-%d')}.xlsx",
+                mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+        elif req_format == 'so_excel':
             excel_file = generate_so_excel_report(so_summary, df_lines)
             return send_file(
                 excel_file,
