@@ -293,7 +293,7 @@ def calculate_availability_predictions(file_mb52, cohv_files):
 
     # 5. MATERIAL DESCRIPTION LEVEL PREDICTIONS
     mat_summary = article_summary.groupby('Material Description', as_index=False).agg(
-        Associated_Articles=('Article', lambda x: ', '.join(sorted(x.unique()))),
+        Associated_Articles=('Article', lambda x: ', '.join(sorted([str(i) for i in x.unique() if pd.notna(i)]))),
         Unrestricted_Stock=('Unrestricted_Stock', 'sum'),
         Transit_Stock=('Transit_Stock', 'sum'),
         Initial_Stock_MB52=('Initial_Stock_MB52', 'sum'),
@@ -493,7 +493,7 @@ def generate_excel_report(article_summary, mat_summary, so_summary, df_lines):
         if not df_shortage.empty:
             impact_df = df_shortage.groupby(['Material Description', 'Article'], as_index=False).agg(
                 Impacted_SICs_Count=('Sales Document', 'nunique'),
-                Impacted_Sales_Orders=('Sales Document', lambda x: ', '.join(sorted(x.unique()))),
+                Impacted_Sales_Orders=('Sales Document', lambda x: ', '.join(sorted([str(i) for i in x.unique() if pd.notna(i)]))),
                 Total_Item_Shortage=('Shortage_Qty', 'sum'),
                 Initial_Available_Stock=('Initial_Stock_MB52', 'first')
             ).sort_values(by=['Impacted_SICs_Count', 'Total_Item_Shortage'], ascending=[False, False])
