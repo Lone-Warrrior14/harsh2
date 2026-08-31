@@ -629,11 +629,11 @@ def predict():
             days_on_hand = round(tot_stock_val / daily_demand_val, 1) if daily_demand_val > 0 else (999.0 if tot_stock_val > 0 else 0.0)
 
             # Top 10 Stockout Risk Materials for chart
-            top_risk_mat = mat_summary[mat_summary['Total_Shortage_Qty'] > 0].head(10)
+            top_risk_mat = mat_summary[mat_summary['Total_Shortage_Qty'] > 0].head(10).fillna('')
             top_risk_mat_list = top_risk_mat[['Material Description', 'Initial_Stock_MB52', 'Total_Future_Demand', 'Total_Shortage_Qty', 'Stock_Depletion_Date']].to_dict(orient='records')
 
             # Top 10 Stockout Risk Articles
-            top_risk_df = art_summary[art_summary['Total_Shortage_Qty'] > 0].head(10)
+            top_risk_df = art_summary[art_summary['Total_Shortage_Qty'] > 0].head(10).fillna('')
             top_risk = top_risk_df[['Article', 'Material Description', 'Initial_Stock_MB52', 'Total_Future_Demand', 'Total_Shortage_Qty', 'Stock_Depletion_Date']].to_dict(orient='records')
 
             # SO Status Counts
@@ -643,19 +643,19 @@ def predict():
             mat_rows_df = mat_summary.copy()
             mat_rows_df['Earliest_Demand_Date'] = mat_rows_df['Earliest_Demand_Date'].dt.strftime('%Y-%m-%d').fillna('N/A')
             mat_rows_df['Latest_Demand_Date'] = mat_rows_df['Latest_Demand_Date'].dt.strftime('%Y-%m-%d').fillna('N/A')
-            mat_table_rows = mat_rows_df.head(150).to_dict(orient='records')
+            mat_table_rows = mat_rows_df.head(150).fillna('').to_dict(orient='records')
 
             # Article Rows
             art_rows_df = art_summary.copy()
             art_rows_df['Earliest_Demand_Date'] = art_rows_df['Earliest_Demand_Date'].dt.strftime('%Y-%m-%d').fillna('N/A')
             art_rows_df['Latest_Demand_Date'] = art_rows_df['Latest_Demand_Date'].dt.strftime('%Y-%m-%d').fillna('N/A')
-            art_table_rows = art_rows_df.head(150).to_dict(orient='records')
+            art_table_rows = art_rows_df.head(150).fillna('').to_dict(orient='records')
 
             # Sales Order Rows
             so_table_rows = so_summary.copy()
             so_table_rows['Earliest_Delivery_Date'] = so_table_rows['Earliest_Delivery_Date'].dt.strftime('%Y-%m-%d').fillna('N/A')
             so_table_rows['Latest_Delivery_Date'] = so_table_rows['Latest_Delivery_Date'].dt.strftime('%Y-%m-%d').fillna('N/A')
-            so_table_rows = so_table_rows.to_dict(orient='records')
+            so_table_rows = so_table_rows.fillna('').to_dict(orient='records')
 
             # Sales Order Line Items Breakdown for Modal Drilldown
             cols_so_items = [
@@ -688,6 +688,7 @@ def predict():
                 'FULLY COVERED ON TIME',
                 np.where(so_line_df['Fulfilled_Qty'].round(4) > 0, 'PARTIALLY COVERED', 'STOCKOUT / UNFULFILLABLE')
             )
+            so_line_df = so_line_df.fillna('')
 
             so_line_dict = {}
             for so_id, group in so_line_df.groupby('Sales Document'):
