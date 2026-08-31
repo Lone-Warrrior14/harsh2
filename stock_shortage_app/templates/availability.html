@@ -703,7 +703,7 @@
     <!-- Dynamic Dashboard View -->
     <div class="dashboard-section" id="dashboardView">
         <!-- KPI Row -->
-        <div class="kpi-grid">
+        <div class="kpi-grid" style="grid-template-columns: repeat(6, 1fr);">
             <div class="kpi-card success">
                 <div class="kpi-title">Initial Stock Value (MB52)</div>
                 <div class="kpi-value" id="kpiStock">SAR 0.00</div>
@@ -724,9 +724,14 @@
                 <div class="kpi-value" id="kpiFulfillment">0%</div>
                 <div class="kpi-sub">Demands Covered on Time</div>
             </div>
+            <div class="kpi-card" style="border-left: 4px solid var(--accent-purple);">
+                <div class="kpi-title">Days on Hand (DOH)</div>
+                <div class="kpi-value" id="kpiDoh" style="color: var(--accent-purple);">0 Days</div>
+                <div class="kpi-sub" id="kpiDohSub">Overall Stock Coverage Runway</div>
+            </div>
             <div class="kpi-card critical">
                 <div class="kpi-title">Earliest Stock Depletion Date</div>
-                <div class="kpi-value" id="kpiRunout" style="font-size: 18px; color: #f43f5e;">-</div>
+                <div class="kpi-value" id="kpiRunout" style="font-size: 16px; color: #f43f5e;">-</div>
                 <div class="kpi-sub">Earliest Stock Runout Date</div>
             </div>
         </div>
@@ -884,6 +889,64 @@
     </div>
 </div>
 
+<!-- Item Shortage Impact Modal -->
+<div id="itemImpactModal" class="modal-backdrop">
+    <div class="modal-card">
+        <div class="modal-header">
+            <div>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <h2 id="itemImpactTitle" style="font-size:20px; font-weight:700; color:var(--accent-cyan);">Item Impact Analysis</h2>
+                    <span id="itemImpactBadge" class="badge badge-critical"></span>
+                </div>
+                <p id="itemImpactSub" style="font-size:12px; color:var(--text-muted); margin-top:4px;"></p>
+            </div>
+            <button class="modal-close-btn" id="closeItemImpactModalBtn">&times;</button>
+        </div>
+
+        <div style="padding-bottom:12px;">
+            <div class="kpi-grid" style="grid-template-columns: repeat(2, 1fr); margin-bottom: 16px;">
+                <div class="kpi-card critical" style="padding:12px 16px;">
+                    <div class="kpi-title" style="font-size:11px;">Impacted Sales Orders (SICs)</div>
+                    <div class="kpi-value" id="itemImpactSicCount" style="font-size:20px; color:#f43f5e;">0</div>
+                </div>
+                <div class="kpi-card warning" style="padding:12px 16px;">
+                    <div class="kpi-title" style="font-size:11px;">Total Shortage Quantity</div>
+                    <div class="kpi-value" id="itemImpactTotalShortage" style="font-size:20px; color:#fbbf24;">0</div>
+                </div>
+            </div>
+
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3 style="font-size:14px; font-weight:600; color:var(--text-main);">Sales Orders Blocked By This Shortage</h3>
+                <button id="copyImpactedSicsBtn" class="filter-btn" style="padding:4px 10px; font-size:11px; border-color:var(--accent-purple); color:var(--accent-purple);">
+                    📋 Copy All Sales Order Numbers
+                </button>
+            </div>
+
+            <div id="impactedSicsSummaryBox" style="display:none; margin-bottom:12px; padding:10px 14px; background:rgba(244,63,94,0.1); border:1px solid rgba(244,63,94,0.3); border-radius:8px;">
+                <div style="font-size:11px; font-weight:600; color:#f43f5e; margin-bottom:4px;">UNFULFILLABLE SALES ORDER NUMBERS:</div>
+                <div id="impactedSicsListText" style="font-size:12px; font-weight:700; color:var(--text-main); word-break:break-all; font-family:monospace;"></div>
+            </div>
+
+            <div class="table-responsive" style="max-height: 380px;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Sales Document (SIC)</th>
+                            <th>Requirement Date</th>
+                            <th>Ordered Qty</th>
+                            <th>Fulfilled Qty</th>
+                            <th style="color:#f43f5e;">Shortage Qty</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemImpactTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
     const mb52Input = document.getElementById('mb52Input');
     const cohvInput = document.getElementById('cohvInput');
@@ -913,6 +976,7 @@
     let globalArtRows = [];
     let globalSoRows = [];
     let globalSoLineDict = {};
+    let globalItemImpactDict = {};
     let currentModalSoDoc = null;
     let activeModalFilter = 'all';
     let riskChartInstance = null;
@@ -1134,6 +1198,11 @@
         document.getElementById('kpiRisk').innerText = (kpis.critical_count + kpis.risk_count).toLocaleString();
         document.getElementById('kpiRiskSub').innerText = `${kpis.critical_count} Critical 0-Stock | Shortage: ${fmtCurr(kpis.total_shortage_val)}`;
         document.getElementById('kpiFulfillment').innerText = kpis.fulfillment_rate + '%';
+        
+        const dohVal = kpis.days_on_hand !== undefined ? kpis.days_on_hand : 0;
+        document.getElementById('kpiDoh').innerText = dohVal >= 999 ? '30+ Days' : `${dohVal} Days`;
+        document.getElementById('kpiDohSub').innerText = dohVal >= 999 ? 'Sufficient Stock Coverage' : `~${fmtCurr(kpis.total_demand_val / 30)} / Day`;
+        
         document.getElementById('kpiRunout').innerText = kpis.earliest_depletion;
 
         renderCharts(data.top_risk_materials, data.so_status_counts);
@@ -1142,6 +1211,7 @@
         globalArtRows = data.art_table_rows;
         globalSoRows = data.so_table_rows;
         globalSoLineDict = data.so_line_dict || {};
+        globalItemImpactDict = data.item_impact_dict || {};
 
         applyMainFilter();
         renderSoTable(globalSoRows);
@@ -1170,19 +1240,8 @@
                 plugins: {
                     legend: { labels: { color: '#94a3b8' } },
                     zoom: {
-                        pan: {
-                            enabled: true,
-                            mode: 'xy'
-                        },
-                        zoom: {
-                            wheel: {
-                                enabled: true
-                            },
-                            pinch: {
-                                enabled: true
-                            },
-                            mode: 'xy'
-                        }
+                        pan: { enabled: true, mode: 'xy' },
+                        zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'xy' }
                     }
                 },
                 scales: {
@@ -1236,7 +1295,7 @@
                     <th>Future Demand</th>
                     <th>Net Balance</th>
                     <th>Coverage %</th>
-                    <th>Unfulfilled Orders</th>
+                    <th>Impacted Sales Orders (SICs)</th>
                     <th style="color:#f43f5e;">📅 Stock Depletion Date</th>
                     <th>Runway / Days</th>
                     <th>Status</th>
@@ -1251,7 +1310,7 @@
                     <th>Future Demand</th>
                     <th>Net Balance</th>
                     <th>Coverage %</th>
-                    <th>Unfulfilled Orders</th>
+                    <th>Impacted Sales Orders (SICs)</th>
                     <th style="color:#f43f5e;">📅 Stock Depletion Date</th>
                     <th>Runway / Days</th>
                     <th>Status</th>
@@ -1278,16 +1337,16 @@
                 stockDisplay = `<span style="color:#10b981; font-weight:600;">${r.Initial_Stock_MB52.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</span>`;
             }
 
-            // Unfulfilled Orders Formatting
+            // Unfulfilled / Impacted Orders Formatting
             let unfulfilledDisplay = '';
             const unfulfilledCount = r.Unfulfilled_Orders_Count || 0;
             const totalCount = r.Total_Orders_Count || 0;
-            const searchKey = mode === 'material' ? (r['Material Description'] || '') : (r.Article || '');
+            const itemKey = mode === 'material' ? (r['Material Description'] || '') : (r.Article || '');
 
             if (unfulfilledCount > 0) {
-                unfulfilledDisplay = `<span style="color:#f43f5e; font-weight:700; cursor:pointer;" title="Click to view unfulfilled sales orders" onclick="searchSoByArticle('${searchKey}')">⚠️ ${unfulfilledCount} / ${totalCount} SOs</span>`;
+                unfulfilledDisplay = `<span style="color:#f43f5e; font-weight:700; cursor:pointer;" title="Click to view impacted Sales Orders (SICs) for this item" onclick="openItemImpactModal('${itemKey.replace(/'/g, "\\'")}')">⚠️ ${unfulfilledCount} SICs Impacted (${unfulfilledCount}/${totalCount})</span>`;
             } else {
-                unfulfilledDisplay = `<span style="color:#10b981; font-weight:600;">✅ 0 / ${totalCount} SOs</span>`;
+                unfulfilledDisplay = `<span style="color:#10b981; font-weight:600;">✅ 0 SICs Impacted (${totalCount} Total)</span>`;
             }
 
             // Depletion Date Display Formatting
@@ -1315,7 +1374,7 @@
             const tr = document.createElement('tr');
             if (mode === 'material') {
                 tr.innerHTML = `
-                    <td style="font-weight:600; color:var(--accent-cyan); cursor:pointer;" title="Click to filter Sales Orders by ${r['Material Description']}" onclick="searchSoByArticle('${r['Material Description']}')">🔍 ${r['Material Description']}</td>
+                    <td style="font-weight:600; color:var(--accent-cyan); cursor:pointer;" title="Click to view shortage impact report for ${r['Material Description']}" onclick="openItemImpactModal('${r['Material Description'].replace(/'/g, "\\'")}')">🔍 ${r['Material Description']}</td>
                     <td style="font-size:11px; color:var(--text-muted);">${r.Associated_Articles || '-'}</td>
                     <td>${stockDisplay}</td>
                     <td>${r.Total_Future_Demand.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</td>
@@ -1328,7 +1387,7 @@
                 `;
             } else {
                 tr.innerHTML = `
-                    <td style="font-weight: 600; color: var(--accent-cyan); cursor:pointer;" title="Click to filter Sales Orders by Article ${r.Article}" onclick="searchSoByArticle('${r.Article}')">🔍 ${r.Article}</td>
+                    <td style="font-weight: 600; color: var(--accent-cyan); cursor:pointer;" title="Click to view shortage impact report for Article ${r.Article}" onclick="openItemImpactModal('${r.Article.replace(/'/g, "\\'")}')">🔍 ${r.Article}</td>
                     <td>${r['Material Description'] || r.Article}</td>
                     <td>${stockDisplay}</td>
                     <td>${r.Total_Future_Demand.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</td>
@@ -1343,6 +1402,100 @@
             tbody.appendChild(tr);
         });
     }
+
+    let currentImpactedSoListStr = '';
+
+    function openItemImpactModal(itemKey) {
+        const modal = document.getElementById('itemImpactModal');
+        const impactData = globalItemImpactDict[itemKey];
+
+        document.getElementById('itemImpactTitle').innerText = `Item Impact: ${itemKey}`;
+        const summaryBox = document.getElementById('impactedSicsSummaryBox');
+        const listText = document.getElementById('impactedSicsListText');
+        
+        if (!impactData || !impactData.Impacted_Sales_Orders || impactData.Impacted_Sales_Orders.length === 0) {
+            document.getElementById('itemImpactSub').innerText = 'No Sales Orders (SICs) are currently impacted by shortages for this item.';
+            document.getElementById('itemImpactBadge').className = 'badge badge-ok';
+            document.getElementById('itemImpactBadge').innerText = 'NO SHORTAGE IMPACT';
+            document.getElementById('itemImpactSicCount').innerText = '0 SICs';
+            document.getElementById('itemImpactTotalShortage').innerText = '0 Units';
+            summaryBox.style.display = 'none';
+            currentImpactedSoListStr = '';
+            renderItemImpactTable([]);
+        } else {
+            const uniqueSoDocs = [...new Set(impactData.Impacted_Sales_Orders.map(so => String(so['Sales Document'])))];
+            currentImpactedSoListStr = uniqueSoDocs.join(', ');
+
+            document.getElementById('itemImpactSub').innerText = `Material: ${impactData.Material_Description} (Article: ${impactData.Article})`;
+            document.getElementById('itemImpactBadge').className = 'badge badge-critical';
+            document.getElementById('itemImpactBadge').innerText = 'SHORTAGE IMPACTING SICs';
+            document.getElementById('itemImpactSicCount').innerText = `${impactData.Impacted_SICs_Count} Sales Orders`;
+            document.getElementById('itemImpactTotalShortage').innerText = `${impactData.Total_Shortage_Qty.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})} Units Short`;
+            
+            listText.innerText = currentImpactedSoListStr;
+            summaryBox.style.display = 'block';
+
+            renderItemImpactTable(impactData.Impacted_Sales_Orders);
+        }
+
+        modal.style.display = 'flex';
+    }
+
+    const copyImpactedSicsBtn = document.getElementById('copyImpactedSicsBtn');
+    if (copyImpactedSicsBtn) {
+        copyImpactedSicsBtn.addEventListener('click', () => {
+            if (!currentImpactedSoListStr) return;
+            navigator.clipboard.writeText(currentImpactedSoListStr).then(() => {
+                const originalText = copyImpactedSicsBtn.innerHTML;
+                copyImpactedSicsBtn.innerHTML = '✔ Copied to Clipboard!';
+                setTimeout(() => { copyImpactedSicsBtn.innerHTML = originalText; }, 2000);
+            }).catch(() => {
+                alert('Sales Order List:\n' + currentImpactedSoListStr);
+            });
+        });
+    }
+
+    function renderItemImpactTable(sos) {
+        const tbody = document.getElementById('itemImpactTableBody');
+        tbody.innerHTML = '';
+
+        if (sos.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color: var(--text-muted); padding: 20px;">No impacted Sales Orders found for this material.</td></tr>`;
+            return;
+        }
+
+        sos.forEach(so => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td style="font-weight:600; color:var(--accent-purple); cursor:pointer;" onclick="inspectSoFromImpact('${so['Sales Document']}')">🔍 ${so['Sales Document']}</td>
+                <td>${so.Requirement_Date || 'N/A'}</td>
+                <td>${so.Ordered_Qty.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</td>
+                <td>${so.Fulfilled_Qty.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</td>
+                <td style="color:#f43f5e; font-weight:700;">⚠️ ${so.Shortage_Qty.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</td>
+                <td>
+                    <button class="filter-btn" style="padding:4px 8px; font-size:11px;" onclick="inspectSoFromImpact('${so['Sales Document']}')">Inspect SIC</button>
+                </td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function inspectSoFromImpact(soDoc) {
+        document.getElementById('itemImpactModal').style.display = 'none';
+        const cleanKey = cleanSoKey(soDoc);
+        const headerData = globalSoRows.find(r => cleanSoKey(r['Sales Document']) === cleanKey);
+        openSoModal(soDoc, headerData);
+    }
+
+    document.getElementById('closeItemImpactModalBtn').addEventListener('click', () => {
+        document.getElementById('itemImpactModal').style.display = 'none';
+    });
+
+    document.getElementById('itemImpactModal').addEventListener('click', (e) => {
+        if (e.target === document.getElementById('itemImpactModal')) {
+            document.getElementById('itemImpactModal').style.display = 'none';
+        }
+    });
 
     function renderSoTable(rows) {
         const tbody = document.getElementById('soTableBody');
@@ -1452,7 +1605,7 @@
             }
             const availAtDate = (item.Opening_Stock_Balance !== undefined && item.Opening_Stock_Balance !== null) ? Math.max(0, item.Opening_Stock_Balance) : item.Initial_Stock_MB52;
             tr.innerHTML = `
-                <td style="font-weight:600; color:var(--accent-cyan); cursor:pointer;" title="Click to filter Sales Orders containing Article ${item.Article}" onclick="searchSoByArticle('${item.Article}')">🔍 ${item.Article}</td>
+                <td style="font-weight:600; color:var(--accent-cyan); cursor:pointer;" title="Click to view shortage impact report for Article ${item.Article}" onclick="openItemImpactModal('${item.Article.replace(/'/g, "\\'")}')">🔍 ${item.Article}</td>
                 <td>${item['Material Description'] || item.Article}</td>
                 <td>${item.Requirement_Date || 'N/A'}</td>
                 <td>${item.Ordered_Qty.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})}</td>
@@ -1502,6 +1655,7 @@
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             document.getElementById('soModal').style.display = 'none';
+            document.getElementById('itemImpactModal').style.display = 'none';
         }
     });
 

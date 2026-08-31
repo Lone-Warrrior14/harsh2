@@ -13,11 +13,15 @@ def normalize_cols(df):
     df.columns = [str(col).strip() for col in df.columns]
     col_map = {}
     for col in df.columns:
-        c_lower = col.lower().replace(' ', '').replace('_', '').replace('-', '')
+        c_lower = col.lower().replace(' ', '').replace('_', '').replace('-', '').replace('/', '')
         if c_lower in ['article', 'material', 'materialnumber', 'item', 'matnr']:
             col_map[col] = 'Article'
+        elif 'valuetransit' in c_lower or ('value' in c_lower and ('transit' in c_lower or 'transfer' in c_lower)):
+            col_map[col] = 'Value Transit'
         elif 'value' in c_lower and 'unrestricted' in c_lower:
             col_map[col] = 'Value Unrestricted'
+        elif ('transit' in c_lower or 'transfer' in c_lower) and 'value' not in c_lower:
+            col_map[col] = 'Transit'
         elif c_lower in ['unrestricted', 'unrestrictedstock', 'unrestricteduse', 'labst', 'available', 'availablestock']:
             col_map[col] = 'Unrestricted'
         elif c_lower in ['salesdocument', 'salesdoc', 'so', 'salesorder', 'vbeln']:
@@ -38,6 +42,25 @@ def normalize_cols(df):
             col_map[col] = 'Sales Office'
         elif c_lower in ['site', 'plant', 'werks']:
             col_map[col] = 'Site'
+    
+    # Avoid duplicate column names after rename
+    new_cols = []
+    seen = set()
+    for col in df.columns:
+        target = col_map.get(col, col)
+        if target in seen:
+            # Append suffix to avoid duplicate DataFrame columns
+            count = 1
+            alt_target = f"{target}_{count}"
+            while alt_target in seen:
+                count += 1
+                alt_target = f"{target}_{count}"
+            seen.add(alt_target)
+            col_map[col] = alt_target
+        else:
+            seen.add(target)
+            col_map[col] = target
+
     df.rename(columns=col_map, inplace=True)
     return df
 
@@ -46,6 +69,7 @@ def calculate_availability_predictions(file_mb52, cohv_files):
     """
     Core calculation engine for Product Availability Predictor.
     Calculates exact Stock Depletion Dates, Runway Days, and Order Fulfillment.
+    Combines Unrestricted + Transit/Transfer Stock for total available inventory.
     Excludes rows where Phantom item == 'X'.
     """
     today = pd.Timestamp.now().normalize()
@@ -54,8 +78,8 @@ def calculate_availability_predictions(file_mb52, cohv_files):
     df_mb52 = pd.read_excel(file_mb52)
     df_mb52 = normalize_cols(df_mb52)
 
-    if 'Article' not in df_mb52.columns or 'Unrestricted' not in df_mb52.columns:
-        raise ValueError(f"MB52 file missing required columns ('Article', 'Unrestricted'). Found: {list(df_mb52.columns)}")
+    if 'Article' not in df_mb52.columns:
+        raise ValueError(f"MB52 file missing required 'Article' column. Found: {list(df_mb52.columns)}")
 
     # Remove Phantom items from MB52 if column exists
     if 'Phantom item' in df_mb52.columns:
@@ -66,11 +90,22 @@ def calculate_availability_predictions(file_mb52, cohv_files):
         df_mb52 = df_mb52[~df_mb52['Material Description'].astype(str).str.contains('gls', case=False, na=False)].copy()
 
     df_mb52['Article'] = df_mb52['Article'].astype(str).str.strip().str.replace(r'\.0$', '', regex=True).str.lstrip('0')
-    df_mb52['Unrestricted'] = pd.to_numeric(df_mb52['Unrestricted'], errors='coerce').fillna(0)
-    if 'Value Unrestricted' in df_mb52.columns:
-        df_mb52['Value Unrestricted'] = pd.to_numeric(df_mb52['Value Unrestricted'], errors='coerce').fillna(0)
-    else:
-        df_mb52['Value Unrestricted'] = 0.0
+    
+    # Parse Unrestricted Stock (Qty & Value)
+    unrest_series = df_mb52['Unrestricted'] if 'Unrestricted' in df_mb52.columns else pd.Series(0, index=df_mb52.index)
+    val_unrest_series = df_mb52['Value Unrestricted'] if 'Value Unrestricted' in df_mb52.columns else pd.Series(0, index=df_mb52.index)
+    df_mb52['Unrestricted'] = pd.to_numeric(unrest_series, errors='coerce').fillna(0)
+    df_mb52['Value Unrestricted'] = pd.to_numeric(val_unrest_series, errors='coerce').fillna(0)
+
+    # Parse Transit / Transfer Stock (Qty & Value)
+    transit_series = df_mb52['Transit'] if 'Transit' in df_mb52.columns else pd.Series(0, index=df_mb52.index)
+    val_transit_series = df_mb52['Value Transit'] if 'Value Transit' in df_mb52.columns else pd.Series(0, index=df_mb52.index)
+    df_mb52['Transit'] = pd.to_numeric(transit_series, errors='coerce').fillna(0)
+    df_mb52['Value Transit'] = pd.to_numeric(val_transit_series, errors='coerce').fillna(0)
+
+    # Combined Total Available Stock = Unrestricted + Transit/Transfer
+    df_mb52['Total_Available_Stock'] = df_mb52['Unrestricted'] + df_mb52['Transit']
+    df_mb52['Total_Stock_Value'] = df_mb52['Value Unrestricted'] + df_mb52['Value Transit']
 
     # 2. Read and combine COHV requirement files
     df_cohv_list = []
@@ -114,8 +149,10 @@ def calculate_availability_predictions(file_mb52, cohv_files):
 
     # MB52 stock aggregation by Article with monetary valuation
     stock_summary = df_mb52.groupby('Article', as_index=False).agg(
-        Initial_Stock_MB52=('Unrestricted', 'sum'),
-        Initial_Stock_Value=('Value Unrestricted', 'sum')
+        Unrestricted_Stock=('Unrestricted', 'sum'),
+        Transit_Stock=('Transit', 'sum'),
+        Initial_Stock_MB52=('Total_Available_Stock', 'sum'),
+        Initial_Stock_Value=('Total_Stock_Value', 'sum')
     )
     stock_summary['Unit_Price'] = np.where(
         stock_summary['Initial_Stock_MB52'] > 0,
@@ -177,6 +214,8 @@ def calculate_availability_predictions(file_mb52, cohv_files):
     all_articles = pd.DataFrame({'Article': all_article_ids})
     
     article_summary = pd.merge(all_articles, stock_summary, on='Article', how='left')
+    article_summary['Unrestricted_Stock'] = article_summary['Unrestricted_Stock'].fillna(0)
+    article_summary['Transit_Stock'] = article_summary['Transit_Stock'].fillna(0)
     article_summary['Initial_Stock_MB52'] = article_summary['Initial_Stock_MB52'].fillna(0)
     
     article_summary = pd.merge(article_summary, article_meta, on='Article', how='left')
@@ -254,6 +293,8 @@ def calculate_availability_predictions(file_mb52, cohv_files):
     # 5. MATERIAL DESCRIPTION LEVEL PREDICTIONS
     mat_summary = article_summary.groupby('Material Description', as_index=False).agg(
         Associated_Articles=('Article', lambda x: ', '.join(sorted(x.unique()))),
+        Unrestricted_Stock=('Unrestricted_Stock', 'sum'),
+        Transit_Stock=('Transit_Stock', 'sum'),
         Initial_Stock_MB52=('Initial_Stock_MB52', 'sum'),
         Total_Future_Demand=('Total_Future_Demand', 'sum'),
         Total_Fulfilled_Qty=('Total_Fulfilled_Qty', 'sum'),
@@ -446,6 +487,25 @@ def generate_excel_report(article_summary, mat_summary, so_summary, df_lines):
                 if float(val) > 0:
                     ws_short.write(row_idx, shortage_col, val, critical_format)
 
+        # Sheet 6: Item-to-Sales Order Shortage Impact Report
+        # Groups shortages by Material/Article to detail affected Sales Orders (SICs)
+        if not df_shortage.empty:
+            impact_df = df_shortage.groupby(['Material Description', 'Article'], as_index=False).agg(
+                Impacted_SICs_Count=('Sales Document', 'nunique'),
+                Impacted_Sales_Orders=('Sales Document', lambda x: ', '.join(sorted(x.unique()))),
+                Total_Item_Shortage=('Shortage_Qty', 'sum'),
+                Initial_Available_Stock=('Initial_Stock_MB52', 'first')
+            ).sort_values(by=['Impacted_SICs_Count', 'Total_Item_Shortage'], ascending=[False, False])
+        else:
+            impact_df = pd.DataFrame(columns=['Material Description', 'Article', 'Impacted_SICs_Count', 'Impacted_Sales_Orders', 'Total_Item_Shortage', 'Initial_Available_Stock'])
+
+        impact_df.to_excel(writer, sheet_name='Item_Shortage_Impact_Report', index=False)
+        ws_impact = writer.sheets['Item_Shortage_Impact_Report']
+        ws_impact.freeze_panes(1, 0)
+        for col_idx, col_name in enumerate(impact_df.columns):
+            ws_impact.write(0, col_idx, col_name, header_format)
+            ws_impact.set_column(col_idx, col_idx, max(len(col_name) + 3, 20))
+
     output.seek(0)
     return output
 
@@ -564,6 +624,10 @@ def predict():
             depletion_dates = art_summary[art_summary['Days_Until_Depletion'] < 999]['Stock_Depletion_Date']
             earliest_depletion = depletion_dates.iloc[0] if not depletion_dates.empty else 'No Depletion Expected'
 
+            # Days on Hand (DOH) Formula: Available Stock Value / (Sales Order Value / 30)
+            daily_demand_val = tot_demand_val / 30.0 if tot_demand_val > 0 else 0
+            days_on_hand = round(tot_stock_val / daily_demand_val, 1) if daily_demand_val > 0 else (999.0 if tot_stock_val > 0 else 0.0)
+
             # Top 10 Stockout Risk Materials for chart
             top_risk_mat = mat_summary[mat_summary['Total_Shortage_Qty'] > 0].head(10)
             top_risk_mat_list = top_risk_mat[['Material Description', 'Initial_Stock_MB52', 'Total_Future_Demand', 'Total_Shortage_Qty', 'Stock_Depletion_Date']].to_dict(orient='records')
@@ -630,6 +694,26 @@ def predict():
                 clean_key = str(so_id).strip().replace('.0', '')
                 so_line_dict[clean_key] = group.to_dict(orient='records')
 
+            # Build Item Shortage Impact Dictionary
+            df_shortage_lines = df_lines[df_lines['Shortage_Qty'] > 0.0001].copy()
+            item_impact_dict = {}
+            if not df_shortage_lines.empty:
+                for (mat_desc, art_id), grp in df_shortage_lines.groupby(['Material Description', 'Article']):
+                    impacted_sos = grp[['Sales Document', 'Requirement date_str', 'Requirement quantity (EINHEIT)', 'Fulfilled_Qty', 'Shortage_Qty']].rename(
+                        columns={'Requirement date_str': 'Requirement_Date', 'Requirement quantity (EINHEIT)': 'Ordered_Qty'}
+                    ).to_dict(orient='records')
+                    
+                    impact_obj = {
+                        'Material_Description': mat_desc,
+                        'Article': art_id,
+                        'Impacted_SICs_Count': len(grp['Sales Document'].unique()),
+                        'Total_Shortage_Qty': float(grp['Shortage_Qty'].sum()),
+                        'Impacted_Sales_Orders': impacted_sos
+                    }
+                    item_impact_dict[art_id] = impact_obj
+                    if mat_desc not in item_impact_dict:
+                        item_impact_dict[mat_desc] = impact_obj
+
             return jsonify({
                 'success': True,
                 'kpis': {
@@ -643,7 +727,8 @@ def predict():
                     'critical_count': critical_count,
                     'risk_count': risk_count,
                     'sufficient_count': sufficient_count,
-                    'earliest_depletion': earliest_depletion
+                    'earliest_depletion': earliest_depletion,
+                    'days_on_hand': days_on_hand
                 },
                 'top_risk_articles': top_risk,
                 'top_risk_materials': top_risk_mat_list,
@@ -651,7 +736,8 @@ def predict():
                 'mat_table_rows': mat_table_rows,
                 'art_table_rows': art_table_rows,
                 'so_table_rows': so_table_rows,
-                'so_line_dict': so_line_dict
+                'so_line_dict': so_line_dict,
+                'item_impact_dict': item_impact_dict
             })
         
         else:
