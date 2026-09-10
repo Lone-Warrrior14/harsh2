@@ -740,7 +740,7 @@
         <div class="charts-grid">
             <div class="chart-card">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
-                    <h3 style="margin: 0; font-size: 14px;">Top Material Descriptions at Stockout Risk & Shortage Qty</h3>
+                    <h3 style="margin: 0; font-size: 14px;">Top Material Descriptions at Stockout Risk (Demand Qty vs Available Quantity)</h3>
                     <div style="display: flex; gap: 6px; align-items: center;">
                         <button id="toggleScaleBtn" class="chart-ctrl-btn" style="padding: 4px 10px; font-size: 11px;">📊 Log Scale</button>
                         <button id="resetZoomBtn" class="chart-ctrl-btn" style="padding: 4px 10px; font-size: 11px;">🔍 Reset Zoom</button>
@@ -1227,15 +1227,15 @@
 
         const labels = topRiskMaterials.map(m => m['Material Description'].length > 22 ? m['Material Description'].substring(0,22) + '...' : m['Material Description']);
         const stocks = topRiskMaterials.map(m => m.Initial_Stock_MB52);
-        const shortages = topRiskMaterials.map(m => m.Total_Shortage_Qty);
+        const demands = topRiskMaterials.map(m => m.Total_Future_Demand);
 
         riskChartInstance = new Chart(riskCtx, {
             type: 'bar',
             data: {
                 labels: labels,
                 datasets: [
-                    { label: 'MB52 Stock', data: stocks, backgroundColor: '#38bdf8' },
-                    { label: 'Shortage Qty', data: shortages, backgroundColor: '#f43f5e' }
+                    { label: 'Available Quantity (MB52)', data: stocks, backgroundColor: '#38bdf8' },
+                    { label: 'Demand Qty', data: demands, backgroundColor: '#f43f5e' }
                 ]
             },
             options: {

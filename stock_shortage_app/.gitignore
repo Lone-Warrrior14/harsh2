@@ -1,13 +1,19 @@
-<<<<<<< HEAD
 # Excel files
 *.xlsx
 *.XLSX
+*.xls
+*.xlsm
+*.csv
+*.xlsb
 
 # Python
 __pycache__/
 *.py[cod]
 *$py.class
+*.pyc
+*.pyo
 venv/
+.venv/
 .env
 
 # Build directories
@@ -18,19 +24,8 @@ dist/
 # Logs and outputs
 graphify-out/
 *.pdf
-=======
-venv/
-.venv/
-__pycache__/
-*.pyc
-*.pyo
+
+# IDEs
 .DS_Store
 .idea/
 .vscode/
-
-*.xlsx
-*.xls
-*.xlsm
-*.csv
-*.xlsb
->>>>>>> 32b3bcf3109b6a7029a23c39993996c77ca32e4b

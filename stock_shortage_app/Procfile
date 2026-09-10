@@ -1,5 +1,1 @@
-<<<<<<< HEAD
 web: gunicorn --bind 0.0.0.0:$PORT availability_app:app
-=======
-web: gunicorn --bind 0.0.0.0:$PORT main:app
->>>>>>> 32b3bcf3109b6a7029a23c39993996c77ca32e4b
