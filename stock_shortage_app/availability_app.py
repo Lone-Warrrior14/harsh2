@@ -357,15 +357,15 @@ def calculate_availability_predictions(file_mb52, cohv_files):
     )
 
     so_summary['SO_Fulfillment_Pct'] = np.where(
-        so_summary['Total_Ordered_Qty'] > 0,
-        (so_summary['Deliverable_Qty'] / so_summary['Total_Ordered_Qty'] * 100.0),
-        100.0
-    ).round(1)
+        so_summary['Shortage_Qty'] <= 0.0001,
+        100.0,
+        np.minimum(99.9, (so_summary['Deliverable_Qty'] / so_summary['Total_Ordered_Qty'] * 100.0).round(1))
+    )
 
     def get_so_status(row):
-        if row['SO_Fulfillment_Pct'] >= 100.0:
+        if row['Shortage_Qty'] <= 0.0001:
             return 'READY FOR FULL DELIVERY'
-        elif row['SO_Fulfillment_Pct'] > 0:
+        elif row['Deliverable_Qty'] > 0.0001:
             return 'PARTIAL DELIVERY RISK'
         else:
             return 'UNFULFILLABLE (NO STOCK)'

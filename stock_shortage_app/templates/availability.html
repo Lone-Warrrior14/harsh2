@@ -1557,7 +1557,7 @@
         const totalDeliverable = soHeaderData ? soHeaderData.Deliverable_Qty : lineItems.reduce((s, x) => s + (x.Fulfilled_Qty || 0), 0);
         const totalShortage = soHeaderData ? soHeaderData.Shortage_Qty : lineItems.reduce((s, x) => s + (x.Shortage_Qty || 0), 0);
         const fulfillmentPct = soHeaderData ? soHeaderData.SO_Fulfillment_Pct : (totalOrdered > 0 ? ((totalDeliverable / totalOrdered) * 100).toFixed(1) : 100);
-        const status = soHeaderData ? soHeaderData.SO_Status : (fulfillmentPct >= 100 ? 'READY FOR FULL DELIVERY' : (fulfillmentPct > 0 ? 'PARTIAL DELIVERY RISK' : 'UNFULFILLABLE (NO STOCK)'));
+        const status = soHeaderData ? soHeaderData.SO_Status : (totalShortage <= 0.0001 ? 'READY FOR FULL DELIVERY' : (totalDeliverable > 0.0001 ? 'PARTIAL DELIVERY RISK' : 'UNFULFILLABLE (NO STOCK)'));
 
         let badgeClass = 'badge-ok';
         if (status.includes('UNFULFILLABLE')) badgeClass = 'badge-critical';
