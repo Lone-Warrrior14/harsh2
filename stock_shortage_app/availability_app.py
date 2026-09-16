@@ -618,7 +618,7 @@ def predict():
         req_format = request.form.get('format', request.args.get('format', 'excel'))
 
         if req_format == 'excel':
-            excel_file = generate_excel_report(mat_summary, art_summary, so_summary, df_lines)
+            excel_file = generate_excel_report(art_summary, mat_summary, so_summary, df_lines)
             return send_file(
                 excel_file,
                 as_attachment=True,
